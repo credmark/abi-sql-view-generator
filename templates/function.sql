@@ -1,25 +1,26 @@
-{{config(materialized='view')}}
+CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
+    WITH TAG ( contract_address = '{{ .ContractAddress }}')
+    AS
+        SELECT
+            '{{ .ContractAddress }}' as contract_address
+            ,hash as txn_hash
+            ,block_number as txn_block_number
+            ,transaction_index as txn_index
+            {{ range .Inputs }}
+            ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
+            {{ end }}
+        FROM transactions
+        WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
 
-SELECT
-    '[[ .ContractAddress ]]' as contract_address
-    ,hash as txn_hash
-    ,block_number as txn_block_number
-    ,transaction_index as txn_index
-    [[ range .Inputs ]]
-    ,f_decode_abi_input_parameter(substring([[ .ColumnName ]], [[ .StartPos ]], 64), '[[ .Type ]]') AS inp_[[ .Name ]]
-    [[ end ]]
-FROM {{ source(env_var('DBT_SF_SCHEMA'), 'transactions') }}
-WHERE to_address='[[ .ContractAddress ]]' AND substring(input, 1, 10)='[[ .MethodId ]]'
+        UNION
 
-UNION
-
-SELECT 
-    '[[ .ContractAddress ]]' as contract_address
-    ,transaction_hash as txn_hash
-    ,block_number as txn_block_number
-    ,transaction_index as txn_index
-    [[ range .Inputs ]]
-    ,f_decode_abi_input_parameter(substring([[ .ColumnName ]], [[ .StartPos ]], 64), '[[ .Type ]]') AS inp_[[ .Name ]]
-    [[ end ]]
-FROM {{ source(env_var('DBT_SF_SCHEMA'), 'traces') }}
-WHERE to_address='[[ .ContractAddress ]]' AND substring(input, 1, 10)='[[ .MethodId ]]'
+        SELECT 
+            '{{ .ContractAddress }}' as contract_address
+            ,transaction_hash as txn_hash
+            ,block_number as txn_block_number
+            ,transaction_index as txn_index
+            {{ range .Inputs }}
+            ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
+            {{ end }}
+        FROM traces
+        WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
