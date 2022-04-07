@@ -1,10 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"text/template"
 
@@ -20,49 +20,49 @@ const (
 
 type AbiContract struct {
 	// Events is a slice of AbiEvent struct
-	Events  []AbiEvent
+	Events []AbiEvent
 	// Methods is a slice of AbiMethod struct
 	Methods []AbiMethod
 }
 
 type AbiContractColumn struct {
-	// ColumnName is the name of the column from which to extract and decode the input 
+	// ColumnName is the name of the column from which to extract and decode the input
 	// field from. i.e. ('topics' from the logs table if address is indexed)
 	ColumnName string
 	// InputName refers to the name of the input (argument) to the event or method
-	InputName  string
+	InputName string
 	// InputType is the data type of the input to the event or method
-	InputType  string
+	InputType string
 	// StartPos is the starting position from which to extract information from the hex data
-	StartPos   int
+	StartPos int
 	// Length is the length of characters to extract from the starting position
-	Length     int
+	Length int
 }
 
 type AbiEvent struct {
 	// ContractAddress is the contract address that the event belongs to
 	ContractAddress string
 	// Name is the name of the event
-	Name            string
+	Name string
 	// Inputs is the slice of AbiContractColumn which are the inputs of the event
-	Inputs          []AbiContractColumn
+	Inputs []AbiContractColumn
 	// SigHash is the hash of the event signature
-	SigHash         string
+	SigHash string
 	// Namespace is the namespace prefix added to the name of the SQL view
-	Namespace       string
+	Namespace string
 }
 
 type AbiMethod struct {
 	// ContractAddress is the contract address that the method belongs to
 	ContractAddress string
 	// Name is the name of the method
-	Name            string
+	Name string
 	// Inputs is the slice of AbiContractColumn which contains the inputs of the method
-	Inputs          []AbiContractColumn
+	Inputs []AbiContractColumn
 	// MethodIdHash is the hash of the method ID
-	MethodIdHash    string
+	MethodIdHash string
 	// Namespace is the namespace prefix added to the name of the SQL view
-	Namespace       string
+	Namespace string
 }
 
 func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiContract {
@@ -157,16 +157,16 @@ func getColumnName(inputType string, indexed bool) string {
 }
 
 type Index struct {
-	GlobalIndex int
-	IndexedIndex int
+	GlobalIndex    int
+	IndexedIndex   int
 	UnindexedIndex int
 }
 
 func newIndex() *Index {
 	return &Index{
-		IndexedIndex: 0,
+		IndexedIndex:   0,
 		UnindexedIndex: 0,
-		GlobalIndex: 0,
+		GlobalIndex:    0,
 	}
 }
 
@@ -198,25 +198,28 @@ func calculateStartPos(idx Index, indexed bool, typ string) int {
 	}
 }
 
-func (c *AbiContract) GenerateSql() {
+func (c *AbiContract) GenerateSql() bytes.Buffer {
+	buffer := bytes.Buffer{}
 	for _, v := range c.Events {
 		log.Printf("generating SQL statement for event: %s\n", v.Name)
-		v.generateSql()
+		_, err := buffer.Write(v.generateSql())
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	for _, v := range c.Methods {
 		log.Printf("generating SQL statement for function: %s\n", v.Name)
-		v.generateSql()
+		_, err := buffer.Write(v.generateSql())
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+
+	return buffer
 }
 
-func (e *AbiEvent) generateSql() {
-	outputPath, err := filepath.Abs("out")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	filename := fmt.Sprintf("%s_%s_evt_%s.sql", e.Namespace, e.ContractAddress, e.Name)
+func (e *AbiEvent) generateSql() []byte {
 	fpath, err := filepath.Abs("templates/event.sql")
 	if err != nil {
 		log.Fatal(err)
@@ -227,25 +230,16 @@ func (e *AbiEvent) generateSql() {
 		log.Fatal(err)
 	}
 
-	fp := filepath.Join(outputPath, filename)
-	f, err := os.Create(fp)
+	buffer := bytes.Buffer{}
+	err = t.Execute(&buffer, e)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = t.Execute(f, e)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return buffer.Bytes()
 }
 
-func (m *AbiMethod) generateSql() {
-	outputPath, err := filepath.Abs("out")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	filename := fmt.Sprintf("%s_%s_fn_%s.sql", m.Namespace, m.ContractAddress, m.Name)
+func (m *AbiMethod) generateSql() []byte {
 	fpath, err := filepath.Abs("templates/function.sql")
 	if err != nil {
 		log.Fatal(err)
@@ -256,14 +250,15 @@ func (m *AbiMethod) generateSql() {
 		log.Fatal(err)
 	}
 
-	fp := filepath.Join(outputPath, filename)
-	f, err := os.Create(fp)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = t.Execute(f, m)
+	buffer := bytes.Buffer{}
+	err = t.Execute(&buffer, m)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	return buffer.Bytes()
 }

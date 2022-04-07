@@ -23,4 +23,4 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
             ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
             {{ end }}
         FROM traces
-        WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
+        WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}';

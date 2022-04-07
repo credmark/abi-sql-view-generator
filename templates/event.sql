@@ -10,4 +10,4 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_evt_{{ .Name }}
             ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
             {{ end }}
         FROM logs
-        WHERE address = '{{ .ContractAddress }}' AND substring(topics, 1, 66) = '{{ .SigHash }}'
+        WHERE address = '{{ .ContractAddress }}' AND substring(topics, 1, 66) = '{{ .SigHash }}';
