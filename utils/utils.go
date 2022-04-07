@@ -112,14 +112,21 @@ func newAbiMethods(abi abi.ABI, contractAddress string, namespace string) []AbiM
 
 func createInputs(inputs abi.Arguments, typ string) []AbiContractColumn {
 	newInputs := make([]AbiContractColumn, len(inputs))
-	for idx, input := range inputs {
-		newInputs[idx] = createInput(input, typ, idx)
+	idx := newIndex()
+	for _, input := range inputs {
+		newInputs[idx.GlobalIndex] = createInput(input, typ, *idx)
+		idx.IncrementGlobal()
+		if input.Indexed {
+			idx.IncrementIndexed()
+		} else {
+			idx.IncrementUnindexed()
+		}
 	}
 
 	return newInputs
 }
 
-func createInput(input abi.Argument, typ string, idx int) AbiContractColumn {
+func createInput(input abi.Argument, typ string, idx Index) AbiContractColumn {
 	return AbiContractColumn{
 		ColumnName: getColumnName(typ, input.Indexed),
 		InputName:  input.Name,
@@ -149,15 +156,41 @@ func getColumnName(inputType string, indexed bool) string {
 	}
 }
 
-func calculateStartPos(idx int, indexed bool, typ string) int {
+type Index struct {
+	GlobalIndex int
+	IndexedIndex int
+	UnindexedIndex int
+}
+
+func newIndex() *Index {
+	return &Index{
+		IndexedIndex: 0,
+		UnindexedIndex: 0,
+		GlobalIndex: 0,
+	}
+}
+
+func (i *Index) IncrementIndexed() {
+	i.IndexedIndex += 1
+}
+
+func (i *Index) IncrementUnindexed() {
+	i.UnindexedIndex += 1
+}
+
+func (i *Index) IncrementGlobal() {
+	i.GlobalIndex += 1
+}
+
+func calculateStartPos(idx Index, indexed bool, typ string) int {
 	switch typ {
 	case "function":
-		return fnInitialLength + (idx * individualInputLength)
+		return fnInitialLength + (idx.GlobalIndex * individualInputLength)
 	case "event":
 		if indexed {
-			return indexedInputLength + (idx * (individualInputLength + 3))
+			return indexedInputLength + (idx.IndexedIndex * (individualInputLength + 3))
 		} else {
-			return unindexedInputLength + (idx * individualInputLength)
+			return unindexedInputLength + (idx.UnindexedIndex * individualInputLength)
 		}
 	default:
 		log.Fatal("error: unknown input type")
