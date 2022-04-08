@@ -1,3 +1,3 @@
 select contract_address, abi
 from deployed_contract_metadata
-where contract_address = '0x7be8076f4ea4a4ad08075c2508e481d6c946d12b';
+where contract_address in ('0x7be8076f4ea4a4ad08075c2508e481d6c946d12b', '0xe592427a0aece92de3edee1f18e0157c05861564', '0xd533a949740bb3306d119cc777fa900ba034cd52');
