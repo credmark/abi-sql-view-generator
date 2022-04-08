@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"io/ioutil"
 	"log"
 	"os"
@@ -27,7 +28,7 @@ var (
 )
 
 func getQuery() string {
-	path, _ := filepath.Abs("templates/query_dev.sql")
+	path, _ := filepath.Abs("sql/create_dev.sql")
 	fb, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -37,6 +38,10 @@ func getQuery() string {
 }
 
 func main() {
+
+	var drop bool
+	flag.BoolVar(&drop, "drop", false, "drop all existing views")
+	flag.Parse()
 
 	ctx := sf.WithAsyncMode(context.Background())
 	cfg := sf.Config{
@@ -52,6 +57,11 @@ func main() {
 	dsn, err := sf.DSN(&cfg)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if drop {
+		utils.DropViews(ctx, dsn)
+		os.Exit(0)
 	}
 
 	query := getQuery()
