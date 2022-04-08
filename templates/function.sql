@@ -29,4 +29,4 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
 
         SELECT *
         FROM UNIONED
-        ORDER BY txn_block_number, txn_index
+        ORDER BY txn_block_number, txn_index;
