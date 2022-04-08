@@ -65,6 +65,12 @@ type AbiMethod struct {
 	Namespace string
 }
 
+type Index struct {
+	GlobalIndex    int
+	IndexedIndex   int
+	UnindexedIndex int
+}
+
 func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiContract {
 	return &AbiContract{
 		Events:  newAbiEvents(abi, contractAddress, namespace),
@@ -154,12 +160,6 @@ func getColumnName(inputType string, indexed bool) string {
 		log.Fatal("error: unknown input type")
 		return ""
 	}
-}
-
-type Index struct {
-	GlobalIndex    int
-	IndexedIndex   int
-	UnindexedIndex int
 }
 
 func newIndex() *Index {
@@ -261,4 +261,8 @@ func (m *AbiMethod) generateSql() []byte {
 	}
 
 	return buffer.Bytes()
+}
+
+func (c *AbiContract) GetNumberOfStatements() int {
+	return len(c.Events) + len(c.Methods)
 }

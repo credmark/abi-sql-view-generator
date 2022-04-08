@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"io/ioutil"
 	"log"
@@ -36,6 +37,7 @@ func getQuery() string {
 
 func main() {
 
+	ctx := context.Background()
 	cfg := sf.Config{
 		User:      user,
 		Password:  password,
@@ -86,8 +88,16 @@ func main() {
 		}
 
 		contractAbi := utils.NewAbiContract(contractAddress, abi, namespace)
-		buffer := contractAbi.GenerateSql()
-		log.Println(buffer.String())
+		multiStatementBuffer := contractAbi.GenerateSql()
+		numStatements := contractAbi.GetNumberOfStatements()
+		multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
+
+		log.Println("submitting multi statement query for contract address:", contractAddress)
+		// Since query statements just create views there is no need to catch the result object
+		_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		counter += 1
 
