@@ -45,6 +45,9 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 	processingErrorChan := make(chan error)
 	processingDoneChan := make(chan int)
 	processingErrors := make([]error, 0)
+	viewCountDoneChan := make(chan int)
+	viewCountChan := make(chan int)
+	viewCount := 0
 
 	// Add any errors received in the processingErrorChan to the processingErr slice
 	// and close the below goroutine when a done message is received
@@ -56,6 +59,19 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			case <-processingDoneChan:
 				close(processingDoneChan)
 				close(processingErrorChan)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case count := <-viewCountChan:
+				viewCount += count
+			case <-viewCountDoneChan:
+				close(viewCountDoneChan)
+				close(viewCountChan)
 				return
 			}
 		}
@@ -90,6 +106,8 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			numStatements := contractAbi.GetNumberOfStatements()
 			multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
 
+			viewCountChan <- numStatements
+
 			log.Printf("contractAddress='%s' statementsToProcess=%d\n", contractAddress, numStatements)
 
 			// Since query statements just create views there is no need to catch the result object
@@ -108,9 +126,12 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 
 	contractProcessingGroup.Wait()
 
+	processingDoneChan <- 0
+	viewCountDoneChan <- 0
+
 	if len(processingErrors) > 0 {
 		log.Printf("processing finished with %d errors\n", len(processingErrors))
 	}
 
-	log.Println("done")
+	log.Printf("%d create view statements submitted", viewCount)
 }
