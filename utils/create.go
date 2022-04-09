@@ -78,13 +78,12 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			log.Fatal(err)
 		}
 
-		counter += 1
 		log.Printf("counter=%d\n", counter)
-		contractProcessingGroup.Add(counter)
+		contractProcessingGroup.Add(1)
 
 		log.Println("submitting multi statement query for contract address:", contractAddress)
-		go func(ctx context.Context, contractAddress string, abi abi.ABI, namespace string) {
-			defer contractProcessingGroup.Done()
+		go func(ctx context.Context, contractAddress string, abi abi.ABI, namespace string, wg *sync.WaitGroup) {
+			defer wg.Done()
 
 			contractAbi := NewAbiContract(contractAddress, abi, namespace)
 			multiStatementBuffer := contractAbi.GenerateSql()
@@ -98,8 +97,10 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			if err != nil {
 				processingErrorChan <- err
 			}
-		}(ctx, contractAddress, abiVal, namespace)
 
+		}(ctx, contractAddress, abiVal, namespace, &contractProcessingGroup)
+
+		counter += 1
 		if counter%100 == 0 {
 			log.Printf("%d ABIs processed so far...\n", counter)
 		}
@@ -110,4 +111,6 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 	if len(processingErrors) > 0 {
 		log.Printf("processing finished with %d errors\n", len(processingErrors))
 	}
+
+	log.Println("done")
 }
