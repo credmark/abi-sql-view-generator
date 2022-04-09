@@ -44,38 +44,32 @@ func generateDropStatements(rows *sql.Rows) (bytes.Buffer, int) {
 func dropViews(ctx context.Context, db *sql.DB, buffer bytes.Buffer, rowCount int) {
 	multiStatementCtx, _ := sf.WithMultiStatement(ctx, rowCount)
 
-    res, err := db.ExecContext(multiStatementCtx, buffer.String())
-    if err != nil {
-        log.Fatal(err)
-    }
+	_, err := db.ExecContext(multiStatementCtx, buffer.String())
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    count, err := res.RowsAffected()
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    log.Printf("rows affected: %d\n", count)
+	log.Printf("view deletion complete")
 }
 
-
 func DropViews(ctx context.Context, dsn string) {
-    log.Println("preparing to drop all views...")
+	log.Println("preparing to drop all views...")
 
-    query := getDropQuery()
-    log.Println("connecting to database...")
+	query := getDropQuery()
+	log.Println("connecting to database...")
 
-    db, err := sql.Open("snowflake", dsn)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+	db, err := sql.Open("snowflake", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-    rows, err := db.Query(query)
-    if err != nil {
-        log.Fatal(err)
-    }
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    buffer, rowCount := generateDropStatements(rows)
-    log.Printf("dropping %d views\n", rowCount)
-    dropViews(ctx, db, buffer, rowCount)
+	buffer, rowCount := generateDropStatements(rows)
+	log.Printf("dropping %d views\n", rowCount)
+	dropViews(ctx, db, buffer, rowCount)
 }

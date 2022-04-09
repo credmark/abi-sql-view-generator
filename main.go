@@ -27,7 +27,7 @@ func main() {
 	flag.BoolVar(&drop, "drop", false, "drop all existing views")
 	flag.Parse()
 
-	ctx := sf.WithAsyncMode(context.Background())
+	ctx := context.Background()
 	cfg := sf.Config{
 		User:      user,
 		Password:  password,
