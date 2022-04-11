@@ -1,5 +1,4 @@
 CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
-    -- WITH TAG ( contract_address = '{{ .ContractAddress }}')
     AS
         WITH UNIONED AS (
             SELECT

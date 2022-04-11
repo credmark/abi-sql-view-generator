@@ -1,5 +1,4 @@
 CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_evt_{{ .Name }}
-    -- WITH TAG ( contract_address = '{{ .ContractAddress }}')
     AS
         SELECT
             '{{ .ContractAddress }}' as contract_address
