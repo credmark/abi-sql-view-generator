@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strconv"
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -135,7 +136,7 @@ func createInputs(inputs abi.Arguments, typ string) []AbiContractColumn {
 func createInput(input abi.Argument, typ string, idx Index) AbiContractColumn {
 	return AbiContractColumn{
 		ColumnName: getColumnName(typ, input.Indexed),
-		InputName:  input.Name,
+		InputName:  validateInputName(input.Name, idx.GlobalIndex),
 		InputType:  input.Type.String(),
 		StartPos:   calculateStartPos(idx, input.Indexed, typ),
 		Length:     individualInputLength,
@@ -196,6 +197,14 @@ func calculateStartPos(idx Index, indexed bool, typ string) int {
 		log.Fatal("error: unknown input type")
 		return 0
 	}
+}
+
+func validateInputName(input string, idx int) string {
+	if input == "" {
+		return strconv.Itoa(idx)
+	}
+
+	return input
 }
 
 func (c *AbiContract) GenerateSql() bytes.Buffer {
