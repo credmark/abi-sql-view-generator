@@ -94,10 +94,8 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			log.Fatal(err)
 		}
 
-		log.Printf("counter=%d\n", counter)
 		contractProcessingGroup.Add(1)
 
-		log.Println("submitting multi statement query for contract address:", contractAddress)
 		go func(ctx context.Context, contractAddress string, abi abi.ABI, namespace string, wg *sync.WaitGroup) {
 			defer wg.Done()
 
@@ -107,8 +105,6 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
 
 			viewCountChan <- numStatements
-
-			log.Printf("contractAddress='%s' statementsToProcess=%d\n", contractAddress, numStatements)
 
 			// Since query statements just create views there is no need to catch the result object
 			_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
@@ -120,10 +116,11 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 
 		counter += 1
 		if counter%100 == 0 {
-			log.Printf("%d ABIs processed so far...\n", counter)
+			log.Printf("%d contract addresses processed so far...\n", counter)
 		}
 	}
 
+	log.Println("waiting for all submitted queries to finish processing...")
 	contractProcessingGroup.Wait()
 
 	processingDoneChan <- 0

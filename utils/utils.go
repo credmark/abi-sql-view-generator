@@ -201,7 +201,6 @@ func calculateStartPos(idx Index, indexed bool, typ string) int {
 func (c *AbiContract) GenerateSql() bytes.Buffer {
 	buffer := bytes.Buffer{}
 	for _, v := range c.Events {
-		log.Printf("generating SQL statement for event: %s\n", v.Name)
 		_, err := buffer.Write(v.generateSql())
 		if err != nil {
 			log.Fatal(err)
@@ -209,7 +208,6 @@ func (c *AbiContract) GenerateSql() bytes.Buffer {
 	}
 
 	for _, v := range c.Methods {
-		log.Printf("generating SQL statement for function: %s\n", v.Name)
 		_, err := buffer.Write(v.generateSql())
 		if err != nil {
 			log.Fatal(err)
