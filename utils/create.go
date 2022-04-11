@@ -128,6 +128,10 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 
 	if len(processingErrors) > 0 {
 		log.Printf("processing finished with %d errors\n", len(processingErrors))
+
+		for _, err := range processingErrors {
+			log.Println(err.Error())
+		}
 	}
 
 	log.Printf("%d create view statements submitted", viewCount)
