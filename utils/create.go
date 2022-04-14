@@ -23,7 +23,11 @@ func getCreateQuery() string {
 	return string(fb)
 }
 
-func CreateViews(ctx context.Context, dsn string, namespace string) {
+func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool) {
+
+    if dryRun {
+        log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
+    }
 
 	// Open snowflake connection
 	db, err := sql.Open("snowflake", dsn)
@@ -112,10 +116,12 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 
 			viewCountChan <- numStatements
 
-			// Since query statements just create views there is no need to catch the result object
-			_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
-			if err != nil {
-				processingErrorChan <- err
+			if !dryRun {
+				// Since query statements just create views there is no need to catch the result object
+				_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
+				if err != nil {
+					processingErrorChan <- err
+				}
 			}
 
 		}(ctx, contractAddress, abiVal, namespace, &contractProcessingGroup)

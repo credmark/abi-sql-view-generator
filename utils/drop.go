@@ -52,8 +52,13 @@ func dropViews(ctx context.Context, db *sql.DB, buffer bytes.Buffer, rowCount in
 	log.Printf("view deletion complete")
 }
 
-func DropViews(ctx context.Context, dsn string) {
-	log.Println("preparing to drop all views...")
+func DropViews(ctx context.Context, dsn string, dryRun bool) {
+
+	if dryRun {
+		log.Println("running in dry-run mode. Views will not be dropped")
+	} else {
+		log.Println("preparing to drop all views...")
+	}
 
 	query := getDropQuery()
 	log.Println("connecting to database...")
@@ -71,5 +76,8 @@ func DropViews(ctx context.Context, dsn string) {
 
 	buffer, rowCount := generateDropStatements(rows)
 	log.Printf("dropping %d views\n", rowCount)
-	dropViews(ctx, db, buffer, rowCount)
+
+	if !dryRun {
+		dropViews(ctx, db, buffer, rowCount)
+	}
 }

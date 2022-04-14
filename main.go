@@ -24,7 +24,9 @@ var (
 func main() {
 
 	var drop bool
+	var dryRun bool
 	flag.BoolVar(&drop, "drop", false, "drop all existing views")
+	flag.BoolVar(&dryRun, "dry-run", false, "run without submitting/creating queries")
 	flag.Parse()
 
 	ctx := context.Background()
@@ -44,10 +46,10 @@ func main() {
 	}
 
 	if drop {
-		utils.DropViews(ctx, dsn)
+		utils.DropViews(ctx, dsn, dryRun)
 		os.Exit(0)
 	} else {
-		utils.CreateViews(ctx, dsn, namespace)
+		utils.CreateViews(ctx, dsn, namespace, dryRun)
 		os.Exit(0)
 	}
 }
