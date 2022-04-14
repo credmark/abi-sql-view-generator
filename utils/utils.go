@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	fnInitialLength       = 11
-	indexedInputLength    = 70
-	unindexedInputLength  = 3
-	individualInputLength = 64
+	fnInitialLength              = 11
+	indexedInputLength           = 70
+	unindexedInputLength         = 3
+	individualInputLength        = 64
+	snowflakeIdentifierMaxLength = 255
 )
 
 type AbiContract struct {
@@ -24,6 +25,8 @@ type AbiContract struct {
 	Events []AbiEvent
 	// Methods is a slice of AbiMethod struct
 	Methods []AbiMethod
+	// Skip entire contract if there are validation issues encountered (i.e. input or event names too long)
+	Skip bool
 }
 
 type AbiContractColumn struct {
@@ -76,6 +79,7 @@ func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiC
 	return &AbiContract{
 		Events:  newAbiEvents(abi, contractAddress, namespace),
 		Methods: newAbiMethods(abi, contractAddress, namespace),
+		Skip:    false,
 	}
 }
 
@@ -270,6 +274,39 @@ func (m *AbiMethod) generateSql() []byte {
 	return buffer.Bytes()
 }
 
+func (e *AbiEvent) isValidName() bool {
+	// Constant 6 represents underscores + 'evt' in table name
+	tableNameLength := len(e.Namespace) + len(e.ContractAddress) + len(e.Name) + 6
+
+	return tableNameLength <= snowflakeIdentifierMaxLength
+}
+
+func (m *AbiMethod) isValidName() bool {
+	// Constant 5 represents underscores + 'fn' in table name
+	tableNameLength := len(m.Namespace) + len(m.ContractAddress) + len(m.Name) + 5
+
+	return tableNameLength <= snowflakeIdentifierMaxLength
+}
+
 func (c *AbiContract) GetNumberOfStatements() int {
 	return len(c.Events) + len(c.Methods)
+}
+
+func (c *AbiContract) ValidateNames() {
+	// if any event or function names are not valid set skip to true and exit immediately
+	for _, e := range c.Events {
+		if !e.isValidName() {
+			c.Skip = true
+			log.Println("event name too long:", e.Name)
+			return
+		}
+	}
+
+	for _, m := range c.Methods {
+		if !m.isValidName() {
+			c.Skip = true
+			log.Println("method name too long:", m.Name)
+			return
+		}
+	}
 }

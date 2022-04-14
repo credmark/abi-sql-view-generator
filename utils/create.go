@@ -33,6 +33,7 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 	defer db.Close()
 
 	query := getCreateQuery()
+	log.Println("getting contracts to process with query:\n", query)
 
 	// Get ABIs and contract addresses
 	rows, err := db.Query(query)
@@ -100,6 +101,11 @@ func CreateViews(ctx context.Context, dsn string, namespace string) {
 			defer wg.Done()
 
 			contractAbi := NewAbiContract(contractAddress, abi, namespace)
+			contractAbi.ValidateNames()
+			if contractAbi.Skip {
+				log.Println("skipping contract due to long event or method name")
+				return
+			}
 			multiStatementBuffer := contractAbi.GenerateSql()
 			numStatements := contractAbi.GetNumberOfStatements()
 			multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
