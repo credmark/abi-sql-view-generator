@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_evt_{{ .Name }}
+CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }}_evt_{{ .Name }}
     AS
         SELECT
             '{{ .ContractAddress }}' as contract_address
@@ -6,8 +6,8 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_evt_{{ .Name }}
             ,block_number as evt_block_number
             ,transaction_hash as evt_tx_hash
             {{ range .Inputs }}
-            ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
+            ,ethereum_contracts.decode_abi_input_parameter_prod(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
             {{ end }}
-        FROM logs
+        FROM ethereum.logs
         WHERE address = '{{ .ContractAddress }}' AND substring(topics, 1, 66) = '{{ .SigHash }}'
         ORDER BY evt_block_number, evt_index;

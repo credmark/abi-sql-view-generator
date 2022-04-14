@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
+CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
     AS
         WITH UNIONED AS (
             SELECT
@@ -7,9 +7,9 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
                 ,block_number as txn_block_number
                 ,transaction_index as txn_index
                 {{ range .Inputs }}
-                ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
+                ,ethereum_contracts.decode_abi_input_parameter_prod(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
                 {{ end }}
-            FROM transactions
+            FROM ethereum.transactions
             WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
 
             UNION
@@ -20,9 +20,9 @@ CREATE OR REPLACE VIEW {{ .Namespace }}_{{ .ContractAddress }}_fn_{{ .Name }}
                 ,block_number as txn_block_number
                 ,transaction_index as txn_index
                 {{ range .Inputs }}
-                ,decode_abi_input_parameter_dev(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
+                ,ethereum_contracts.decode_abi_input_parameter_prod(substring({{ .ColumnName }}, {{ .StartPos }}, {{ .Length }}), '{{ .InputType }}') AS inp_{{ .InputName }}
                 {{ end }}
-            FROM traces
+            FROM ethereum.traces
             WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
         )
 
