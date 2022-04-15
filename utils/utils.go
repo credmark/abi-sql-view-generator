@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -30,17 +31,12 @@ type AbiContract struct {
 }
 
 type AbiContractColumn struct {
-	// ColumnName is the name of the column from which to extract and decode the input
-	// field from. i.e. ('topics' from the logs table if address is indexed)
-	ColumnName string
 	// InputName refers to the name of the input (argument) to the event or method
-	InputName string
+	Name string `json:"name"`
 	// InputType is the data type of the input to the event or method
-	InputType string
+	Type string `json:"type"`
 	// StartPos is the starting position from which to extract information from the hex data
-	StartPos int
-	// Length is the length of characters to extract from the starting position
-	Length int
+	Indexed bool `json:"indexed"`
 }
 
 type AbiEvent struct {
@@ -50,6 +46,8 @@ type AbiEvent struct {
 	Name string
 	// Inputs is the slice of AbiContractColumn which are the inputs of the event
 	Inputs []AbiContractColumn
+	// InputsJson is the json string of inputs data
+	InputsJson string
 	// SigHash is the hash of the event signature
 	SigHash string
 	// Namespace is the namespace prefix added to the name of the SQL view
@@ -63,16 +61,12 @@ type AbiMethod struct {
 	Name string
 	// Inputs is the slice of AbiContractColumn which contains the inputs of the method
 	Inputs []AbiContractColumn
+	// InputsJson is the json string of inputs data
+	InputsJson string
 	// MethodIdHash is the hash of the method ID
 	MethodIdHash string
 	// Namespace is the namespace prefix added to the name of the SQL view
 	Namespace string
-}
-
-type Index struct {
-	GlobalIndex    int
-	IndexedIndex   int
-	UnindexedIndex int
 }
 
 func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiContract {
@@ -88,7 +82,8 @@ func newAbiEvent(event abi.Event, contractAddress string, namespace string) *Abi
 		ContractAddress: contractAddress,
 		Name:            event.Name,
 		SigHash:         event.ID.Hex(),
-		Inputs:          createInputs(event.Inputs, "event"),
+		Inputs:          createInputs(event.Inputs),
+		InputsJson:      inputsToJson(createInputs(event.Inputs)),
 		Namespace:       namespace,
 	}
 }
@@ -107,7 +102,8 @@ func newAbiMethod(method abi.Method, contractAddress string, namespace string) *
 		ContractAddress: contractAddress,
 		Name:            method.Name,
 		MethodIdHash:    getMethodIdHash(method.ID),
-		Inputs:          createInputs(method.Inputs, "function"),
+		Inputs:          createInputs(method.Inputs),
+		InputsJson:      inputsToJson(createInputs(method.Inputs)),
 		Namespace:       namespace,
 	}
 }
@@ -121,29 +117,30 @@ func newAbiMethods(abi abi.ABI, contractAddress string, namespace string) []AbiM
 	return newMethods
 }
 
-func createInputs(inputs abi.Arguments, typ string) []AbiContractColumn {
+func inputsToJson(v []AbiContractColumn) string {
+
+	bs, err := json.Marshal(v)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return string(bs)
+}
+
+func createInputs(inputs abi.Arguments) []AbiContractColumn {
 	newInputs := make([]AbiContractColumn, len(inputs))
-	idx := newIndex()
-	for _, input := range inputs {
-		newInputs[idx.GlobalIndex] = createInput(input, typ, *idx)
-		idx.IncrementGlobal()
-		if input.Indexed {
-			idx.IncrementIndexed()
-		} else {
-			idx.IncrementUnindexed()
-		}
+	for idx, input := range inputs {
+		newInputs[idx] = createInput(input, idx)
 	}
 
 	return newInputs
 }
 
-func createInput(input abi.Argument, typ string, idx Index) AbiContractColumn {
+func createInput(input abi.Argument, idx int) AbiContractColumn {
 	return AbiContractColumn{
-		ColumnName: getColumnName(typ, input.Indexed),
-		InputName:  validateInputName(input.Name, idx.GlobalIndex),
-		InputType:  input.Type.String(),
-		StartPos:   calculateStartPos(idx, input.Indexed, typ),
-		Length:     individualInputLength,
+		Name:    validateInputName(input.Name, idx),
+		Type:    input.Type.String(),
+		Indexed: input.Indexed,
 	}
 }
 
@@ -151,61 +148,9 @@ func getMethodIdHash(methodId []byte) string {
 	return fmt.Sprintf("0x%s", hex.EncodeToString(methodId))
 }
 
-func getColumnName(inputType string, indexed bool) string {
-	switch inputType {
-	case "function":
-		return "input"
-	case "event":
-		if indexed {
-			return "topics"
-		} else {
-			return "data"
-		}
-	default:
-		log.Fatal("error: unknown input type")
-		return ""
-	}
-}
-
-func newIndex() *Index {
-	return &Index{
-		IndexedIndex:   0,
-		UnindexedIndex: 0,
-		GlobalIndex:    0,
-	}
-}
-
-func (i *Index) IncrementIndexed() {
-	i.IndexedIndex += 1
-}
-
-func (i *Index) IncrementUnindexed() {
-	i.UnindexedIndex += 1
-}
-
-func (i *Index) IncrementGlobal() {
-	i.GlobalIndex += 1
-}
-
-func calculateStartPos(idx Index, indexed bool, typ string) int {
-	switch typ {
-	case "function":
-		return fnInitialLength + (idx.GlobalIndex * individualInputLength)
-	case "event":
-		if indexed {
-			return indexedInputLength + (idx.IndexedIndex * (individualInputLength + 3))
-		} else {
-			return unindexedInputLength + (idx.UnindexedIndex * individualInputLength)
-		}
-	default:
-		log.Fatal("error: unknown input type")
-		return 0
-	}
-}
-
 func validateInputName(input string, idx int) string {
 	if input == "" {
-		return strconv.Itoa(idx)
+		return fmt.Sprintf("inp_%s", strconv.Itoa(idx))
 	}
 
 	return input
