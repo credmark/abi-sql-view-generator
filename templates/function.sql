@@ -6,7 +6,7 @@ CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }
                 ,hash as txn_hash
                 ,block_number as txn_block_number
                 ,transaction_index as txn_index
-                ,ethereum_contracts.decode_abi_inputs_prod(input, '', parse_json('{{ .InputsJson }}'), "method") AS val
+                ,ethereum_contracts.decode_abi_input_prod(input, '', parse_json('{{ .InputsJson }}'), 'method') AS val
             FROM ethereum.transactions
             WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
 
@@ -17,7 +17,7 @@ CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }
                 ,transaction_hash as txn_hash
                 ,block_number as txn_block_number
                 ,transaction_index as txn_index
-                ,ethereum_contracts.decode_abi_inputs_prod(input, '', parse_json('{{ .InputsJson }}'), "method") AS val
+                ,ethereum_contracts.decode_abi_input_prod(input, '', parse_json('{{ .InputsJson }}'), 'method') AS val
             FROM ethereum.traces
             WHERE to_address='{{ .ContractAddress }}' AND substring(input, 1, 10)='{{ .MethodIdHash }}'
         )
