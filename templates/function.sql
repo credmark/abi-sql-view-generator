@@ -28,14 +28,14 @@ CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }
             SELECT 
                 row_number() OVER (PARTITION BY contract_address, txn_hash, txn_block_number, txn_index ORDER BY error) as row_num
                 ,*
-                ,CASE WHEN error IS NULL THEN true ELSE false END AS is_successful_txn
+                ,CASE WHEN error IS NULL THEN true ELSE false END AS success
             FROM q1
         )
 
         ,q3 AS (
             SELECT
                 *
-                ,ethereum_contracts.decode_abi_input_prod(input, '', parse_json('{{ .InputsJson }}'), 'method', is_successful_txn) AS val
+                ,ethereum_contracts.decode_abi_input_prod(input, '', parse_json('{{ .InputsJson }}'), 'method', success) AS val
             FROM q2
             WHERE row_num = 1
         )
@@ -45,7 +45,7 @@ CREATE OR REPLACE VIEW ethereum_contracts.{{ .Namespace }}_{{ .ContractAddress }
             ,txn_block_number
             ,txn_hash
             ,txn_index
-            ,is_successful_txn
+            ,success
             {{ range .Inputs }}
             ,val:{{ .Name }} as inp_{{ .Name }}
             {{ end }}
