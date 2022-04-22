@@ -21,6 +21,10 @@ var (
 	namespace = os.Getenv("NAMESPACE")
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func main() {
 
 	var drop bool
