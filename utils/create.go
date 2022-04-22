@@ -14,7 +14,7 @@ import (
 )
 
 func getCreateQuery() string {
-	path, _ := filepath.Abs("sql/create_dev.sql")
+	path, _ := filepath.Abs("sql/create.sql")
 	fb, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
