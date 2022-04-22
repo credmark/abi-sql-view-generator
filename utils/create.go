@@ -13,6 +13,18 @@ import (
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
+type SnowflakeError struct {
+	ContractAddress string
+	Error error
+}
+
+func NewSnowflakeError(contractAddress string, err error) *SnowflakeError {
+	return &SnowflakeError{
+		ContractAddress: contractAddress,
+		Error: err,
+	}
+}
+
 func getCreateQuery() string {
 	path, _ := filepath.Abs("sql/create.sql")
 	fb, err := ioutil.ReadFile(path)
@@ -47,9 +59,9 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 	defer rows.Close()
 
 	// Create channels for communicating with goroutines
-	processingErrorChan := make(chan error)
+	processingErrorChan := make(chan SnowflakeError)
 	processingDoneChan := make(chan int)
-	processingErrors := make([]error, 0)
+	processingErrors := make([]SnowflakeError, 0)
 	viewCountDoneChan := make(chan int)
 	viewCountChan := make(chan int)
 	viewCount := 0
@@ -120,7 +132,8 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 				// Since query statements just create views there is no need to catch the result object
 				_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
 				if err != nil {
-					processingErrorChan <- err
+					snowflakeError := NewSnowflakeError(contractAddress, err)
+					processingErrorChan <- *snowflakeError
 				}
 			}
 
@@ -142,7 +155,7 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 		log.Printf("processing finished with %d errors\n", len(processingErrors))
 
 		for _, err := range processingErrors {
-			log.Println(err.Error())
+			log.Printf("ERROR: contractAddress=%s error=%s", err.ContractAddress, err.Error.Error())
 		}
 	}
 
