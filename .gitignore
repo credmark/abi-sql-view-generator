@@ -35,3 +35,6 @@ go.work
 
 # project dependent
 out
+
+# vscode
+.vscode/settings.json
