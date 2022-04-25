@@ -9,7 +9,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 )
 
-func NewConfig(key, secret, region string) aws.Config {
+type Config aws.Config
+
+func NewConfig(key, secret, region string) Config {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(key, secret, "")),
 	)
@@ -17,5 +19,5 @@ func NewConfig(key, secret, region string) aws.Config {
 		log.Fatal("error creating AWS config:", err)
 	}
 
-	return cfg
+	return Config(cfg)
 }

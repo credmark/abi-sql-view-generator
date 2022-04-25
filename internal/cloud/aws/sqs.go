@@ -7,8 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-func SendSQSMessage(cfg aws.Config, queueURL string, body string) error {
-	client := sqs.NewFromConfig(cfg)
+func SendSQSMessage(cfg Config, queueURL string, body string) error {
+	config := aws.Config(cfg)
+	client := sqs.NewFromConfig(config)
 
 	_, err := client.SendMessage(context.TODO(), &sqs.SendMessageInput{
 		MessageBody: aws.String(body),
