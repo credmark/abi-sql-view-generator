@@ -74,16 +74,25 @@ type Options struct {
 	Namespace string
 	DryRun bool
 	Drop bool
+	AddLimit bool
 	Limit int
 	Count int
 }
 
 func NewOptions(dsn, namespace string, dryRun, drop bool, limit, count int) *Options {
+	var addLimit bool
+	if (limit > 0) {
+		addLimit = true
+	} else {
+		addLimit = false
+	}
+
 	return &Options{
 		DSN: dsn,
 		Namespace: namespace,
 		DryRun: dryRun,
 		Drop: drop,
+		AddLimit: addLimit,
 		Limit: limit,
 		Count: count,
 	}

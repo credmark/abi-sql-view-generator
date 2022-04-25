@@ -1,13 +1,14 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
-	"io/ioutil"
 	"log"
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -15,31 +16,41 @@ import (
 
 type SnowflakeError struct {
 	ContractAddress string
-	Error error
+	Error           error
 }
 
 func NewSnowflakeError(contractAddress string, err error) *SnowflakeError {
 	return &SnowflakeError{
 		ContractAddress: contractAddress,
-		Error: err,
+		Error:           err,
 	}
 }
 
-func getCreateQuery() string {
-	path, _ := filepath.Abs("sql/create.sql")
-	fb, err := ioutil.ReadFile(path)
+func getCreateQuery(options *Options) string {
+	fpath, err := filepath.Abs("templates/create.sql")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return string(fb)
+	t, err := template.New("create.sql").ParseFiles(fpath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	buffer := bytes.Buffer{}
+	err = t.Execute(&buffer, options)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return buffer.String()
 }
 
 func CreateViews(ctx context.Context, options *Options) {
 
-    if options.DryRun {
-        log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
-    }
+	if options.DryRun {
+		log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
+	}
 
 	// Open snowflake connection
 	db, err := sql.Open("snowflake", options.DSN)
@@ -48,7 +59,7 @@ func CreateViews(ctx context.Context, options *Options) {
 	}
 	defer db.Close()
 
-	query := getCreateQuery()
+	query := getCreateQuery(options)
 	log.Println("getting contracts to process with query:\n", query)
 
 	// Get ABIs and contract addresses
