@@ -5,7 +5,6 @@ RUN apk --no-cache add build-base git gcc
 
 WORKDIR /usr/local/app
 COPY . .
-RUN go install
 RUN GOARCH=amd64 GOOS=linux go build -ldflags="-s -w" -o sqlgenerator cmd/producer/main.go
 
 # final stage
