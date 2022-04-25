@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
@@ -74,11 +75,17 @@ func CreateViews(ctx context.Context, options *Options) {
 
 	// Create channels for communicating with goroutines
 	processingErrorChan := make(chan SnowflakeError)
+	processingSuccessfulChan := make(chan int)
+	processingSuccessfulDoneChan := make(chan int)
+	processingAttemptedChan := make(chan int)
+	processingAttemptedDoneChan := make(chan int)
 	processingDoneChan := make(chan int)
 	processingErrors := make([]SnowflakeError, 0)
 	viewCountDoneChan := make(chan int)
 	viewCountChan := make(chan int)
 	viewCount := 0
+	successCount := 0
+	attemptedCount := 0
 
 	// Add any errors received in the processingErrorChan to the processingErr slice
 	// and close the below goroutine when a done message is received
@@ -103,6 +110,32 @@ func CreateViews(ctx context.Context, options *Options) {
 			case <-viewCountDoneChan:
 				close(viewCountDoneChan)
 				close(viewCountChan)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case count := <-processingSuccessfulChan:
+				successCount += count
+			case <-processingSuccessfulDoneChan:
+				close(processingSuccessfulDoneChan)
+				close(processingSuccessfulChan)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case count := <-processingAttemptedChan:
+				attemptedCount += count
+			case <-processingAttemptedDoneChan:
+				close(processingAttemptedDoneChan)
+				close(processingAttemptedChan)
 				return
 			}
 		}
@@ -140,21 +173,27 @@ func CreateViews(ctx context.Context, options *Options) {
 			numStatements := contractAbi.GetNumberOfStatements()
 
 			viewCountChan <- numStatements
-
+			
 			message := internal.NewMessage(contractAddress, multiStatementBuffer.String(), numStatements)
-
+			
 			if !options.DryRun {
 				body, err := internal.SerializeMessage(message)
 				if err != nil {
 					snowflakeError := NewSnowflakeError(contractAddress, err)
 					processingErrorChan <- *snowflakeError
+					processingAttemptedChan <- 1
 					return
 				}
 
 				if err = aws.SendSQSMessage(cfg, options.QueueUrl, body); err != nil {
 					snowflakeError := NewSnowflakeError(contractAddress, err)
 					processingErrorChan <- *snowflakeError
+					processingAttemptedChan <- 1
+					return
 				}
+
+				processingAttemptedChan <- 1
+				processingSuccessfulChan <- 1
 			}
 
 		}(ctx, contractAddress, abiVal, options, cfg, &contractProcessingGroup)
@@ -163,6 +202,11 @@ func CreateViews(ctx context.Context, options *Options) {
 		if counter%100 == 0 {
 			log.Printf("%d contract addresses processed so far...\n", counter)
 		}
+
+		if attemptedCount%1000 == 0 {
+			pct := fmt.Sprintf("%0.1f%%", (float64(successCount)/float64(attemptedCount))*100)
+			log.Printf("%d messages out of %d successfully submitted (%s)\n", successCount, attemptedCount, pct)
+		}
 	}
 
 	log.Println("waiting for all submitted queries to finish processing...")
@@ -170,6 +214,8 @@ func CreateViews(ctx context.Context, options *Options) {
 
 	processingDoneChan <- 0
 	viewCountDoneChan <- 0
+	processingAttemptedDoneChan <- 0
+	processingSuccessfulDoneChan <- 0
 
 	if len(processingErrors) > 0 {
 		log.Printf("processing finished with %d errors\n", len(processingErrors))
