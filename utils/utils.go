@@ -69,6 +69,26 @@ type AbiMethod struct {
 	Namespace string
 }
 
+type Options struct {
+	DSN string
+	Namespace string
+	DryRun bool
+	Drop bool
+	Limit int
+	Count int
+}
+
+func NewOptions(dsn, namespace string, dryRun, drop bool, limit, count int) *Options {
+	return &Options{
+		DSN: dsn,
+		Namespace: namespace,
+		DryRun: dryRun,
+		Drop: drop,
+		Limit: limit,
+		Count: count,
+	}
+}
+
 func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiContract {
 	return &AbiContract{
 		Events:  newAbiEvents(abi, contractAddress, namespace),

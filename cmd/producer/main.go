@@ -29,8 +29,12 @@ func main() {
 
 	var drop bool
 	var dryRun bool
+	var limit int
+	var count int
 	flag.BoolVar(&drop, "drop", false, "drop all existing views")
 	flag.BoolVar(&dryRun, "dry-run", false, "run without submitting/creating queries")
+	flag.IntVar(&limit, "limit", 0, "limit number of verified contracts returned for processing")
+	flag.IntVar(&count, "count", 5, "number of minimum logs a contract should have")
 	flag.Parse()
 
 	ctx := context.Background()
@@ -49,11 +53,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	options := utils.NewOptions(dsn, namespace, dryRun, drop, limit, count)
+
 	if drop {
-		utils.DropViews(ctx, dsn, dryRun)
+		utils.DropViews(ctx, options)
 		os.Exit(0)
 	} else {
-		utils.CreateViews(ctx, dsn, namespace, dryRun)
+		utils.CreateViews(ctx, options)
 		os.Exit(0)
 	}
 }

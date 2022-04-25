@@ -52,9 +52,9 @@ func dropViews(ctx context.Context, db *sql.DB, buffer bytes.Buffer, rowCount in
 	log.Printf("view deletion complete")
 }
 
-func DropViews(ctx context.Context, dsn string, dryRun bool) {
+func DropViews(ctx context.Context, options *Options) {
 
-	if dryRun {
+	if options.DryRun {
 		log.Println("running in dry-run mode. Views will not be dropped")
 	} else {
 		log.Println("preparing to drop all views...")
@@ -63,7 +63,7 @@ func DropViews(ctx context.Context, dsn string, dryRun bool) {
 	query := getDropQuery()
 	log.Println("connecting to database...")
 
-	db, err := sql.Open("snowflake", dsn)
+	db, err := sql.Open("snowflake", options.DSN)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func DropViews(ctx context.Context, dsn string, dryRun bool) {
 	buffer, rowCount := generateDropStatements(rows)
 	log.Printf("dropping %d views\n", rowCount)
 
-	if !dryRun {
+	if !options.DryRun {
 		dropViews(ctx, db, buffer, rowCount)
 	}
 }
