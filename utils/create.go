@@ -10,8 +10,9 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/credmark/abi-sql-view-generator/internal"
+	"github.com/credmark/abi-sql-view-generator/internal/cloud/aws"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	sf "github.com/snowflakedb/gosnowflake"
 )
 
 type SnowflakeError struct {
@@ -51,6 +52,8 @@ func CreateViews(ctx context.Context, options *Options) {
 	if options.DryRun {
 		log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
 	}
+
+	cfg := aws.NewConfig(options.Key, options.Secret, options.Region)
 
 	// Open snowflake connection
 	db, err := sql.Open("snowflake", options.DSN)
@@ -124,10 +127,10 @@ func CreateViews(ctx context.Context, options *Options) {
 
 		contractProcessingGroup.Add(1)
 
-		go func(ctx context.Context, contractAddress string, abi abi.ABI, namespace string, wg *sync.WaitGroup) {
+		go func(ctx context.Context, contractAddress string, abi abi.ABI, options *Options, cfg aws.Config, wg *sync.WaitGroup) {
 			defer wg.Done()
 
-			contractAbi := NewAbiContract(contractAddress, abi, namespace)
+			contractAbi := NewAbiContract(contractAddress, abi, options.Namespace)
 			contractAbi.ValidateNames()
 			if contractAbi.Skip {
 				log.Println("skipping contract due to long event or method name")
@@ -135,20 +138,26 @@ func CreateViews(ctx context.Context, options *Options) {
 			}
 			multiStatementBuffer := contractAbi.GenerateSql()
 			numStatements := contractAbi.GetNumberOfStatements()
-			multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
 
 			viewCountChan <- numStatements
 
+			message := internal.NewMessage(contractAddress, multiStatementBuffer.String(), numStatements)
+
 			if !options.DryRun {
-				// Since query statements just create views there is no need to catch the result object
-				_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
+				body, err := internal.SerializeMessage(message)
 				if err != nil {
+					snowflakeError := NewSnowflakeError(contractAddress, err)
+					processingErrorChan <- *snowflakeError
+					return
+				}
+
+				if err = aws.SendSQSMessage(cfg, options.QueueUrl, body); err != nil {
 					snowflakeError := NewSnowflakeError(contractAddress, err)
 					processingErrorChan <- *snowflakeError
 				}
 			}
 
-		}(ctx, contractAddress, abiVal, options.Namespace, &contractProcessingGroup)
+		}(ctx, contractAddress, abiVal, options, cfg, &contractProcessingGroup)
 
 		counter += 1
 		if counter%100 == 0 {
