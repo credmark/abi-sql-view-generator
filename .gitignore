@@ -38,3 +38,9 @@ out
 
 # vscode
 .vscode/settings.json
+
+# Serverless directories
+.serverless
+
+# golang output binary directory
+bin
