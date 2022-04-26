@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -29,13 +28,11 @@ func SendSQSMessage(cfg Config, queueURL string, body string) error {
 	return nil
 }
 
-func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB, wg sync.WaitGroup, successChan chan string, errorChan chan error) {
-	defer wg.Done()
+func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB) error {
 
 	message, err := internal.DeserializeMessage(event.Body)
 	if err != nil {
-		errorChan <- fmt.Errorf("error deserializing SQS message body: %w", err)
-		return
+		return fmt.Errorf("error deserializing SQS message body: %w", err)
 	}
 
 	uuid := sf.NewUUID()
@@ -46,29 +43,44 @@ func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB, 
 
 	_, err = db.ExecContext(multiStatementCtx, message.SQLStatements)
 	if err != nil {
-		errorChan <- fmt.Errorf("error with multistatement query for contract address: %s: %w", message.ContractAddress, err)
-		return
+		return fmt.Errorf("error with multistatement query for contract address: %s: %w", message.ContractAddress, err)
 	}
 
 	log.Printf("query ID %s completed. Deleting SQS message receipt handle %s\n", uuid.String(), event.ReceiptHandle)
 
-	successChan <- event.ReceiptHandle
+	return nil
 }
 
-func DeleteSQSMessage(ctx context.Context, cfg Config, queueURL string, receiptHandle string, errorChan chan error) {
-	config := aws.Config(cfg)
-	client := sqs.NewFromConfig(config)
+func DeleteSQSMessage(ctx context.Context, client *sqs.Client, queueName string, receiptHandle string) error {
+
+	queueURL, err := getQueueURL(ctx, client, queueName)
+	if err != nil {
+		return fmt.Errorf("error running getQueueURL: %w", err)
+	}
 
 	log.Printf("deleting SQS message from queue URL %s\n", queueURL)
 
-	_, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+	_, err = client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
 	})
 	if err != nil {
-		errorChan <- fmt.Errorf("error deleting SQS message: %w", err)
+		return fmt.Errorf("error deleting SQS message: %w", err)
 	}
 
-	log.Printf("SQS message with receipt handle %s deleted\n", receiptHandle)
+	log.Printf("successfully deleted SQS message with receipt handle %s\n", receiptHandle)
 
+	return nil
+}
+
+func getQueueURL(ctx context.Context, client *sqs.Client, queueName string) (string, error) {
+	log.Printf("getting queue URL for queue %s\n", queueName)
+	result, err := client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+		QueueName: aws.String(queueName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("error getting queue URL from queue name: %w", err)
+	}
+
+	return *result.QueueUrl, nil
 }
