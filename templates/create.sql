@@ -9,4 +9,8 @@ select
 from ethereum.logs l
 join verified_contracts c on l.address = c.contract_address
 group by 1, 2
-having count(*) >= 5;
+having count(*) >= {{ .Count }}
+{{ if .AddLimit }}
+limit {{ .Limit }}
+{{ end }}
+;

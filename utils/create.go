@@ -1,54 +1,69 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/template"
 
+	"github.com/credmark/abi-sql-view-generator/internal"
+	"github.com/credmark/abi-sql-view-generator/internal/cloud/aws"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	sf "github.com/snowflakedb/gosnowflake"
 )
 
 type SnowflakeError struct {
 	ContractAddress string
-	Error error
+	Error           error
 }
 
 func NewSnowflakeError(contractAddress string, err error) *SnowflakeError {
 	return &SnowflakeError{
 		ContractAddress: contractAddress,
-		Error: err,
+		Error:           err,
 	}
 }
 
-func getCreateQuery() string {
-	path, _ := filepath.Abs("sql/create.sql")
-	fb, err := ioutil.ReadFile(path)
+func getCreateQuery(options *Options) string {
+	fpath, err := filepath.Abs("templates/create.sql")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return string(fb)
+	t, err := template.New("create.sql").ParseFiles(fpath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	buffer := bytes.Buffer{}
+	err = t.Execute(&buffer, options)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return buffer.String()
 }
 
-func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool) {
+func CreateViews(ctx context.Context, options *Options) {
 
-    if dryRun {
-        log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
-    }
+	if options.DryRun {
+		log.Println("running in dry-run mode. View create statements will not be submitted to snowflake")
+	}
+
+	cfg := aws.NewConfig(options.Key, options.Secret, options.Region)
 
 	// Open snowflake connection
-	db, err := sql.Open("snowflake", dsn)
+	db, err := sql.Open("snowflake", options.DSN)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	query := getCreateQuery()
+	query := getCreateQuery(options)
 	log.Println("getting contracts to process with query:\n", query)
 
 	// Get ABIs and contract addresses
@@ -60,11 +75,17 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 
 	// Create channels for communicating with goroutines
 	processingErrorChan := make(chan SnowflakeError)
+	processingSuccessfulChan := make(chan int)
+	processingSuccessfulDoneChan := make(chan int)
+	processingAttemptedChan := make(chan int)
+	processingAttemptedDoneChan := make(chan int)
 	processingDoneChan := make(chan int)
 	processingErrors := make([]SnowflakeError, 0)
 	viewCountDoneChan := make(chan int)
 	viewCountChan := make(chan int)
 	viewCount := 0
+	successCount := 0
+	attemptedCount := 0
 
 	// Add any errors received in the processingErrorChan to the processingErr slice
 	// and close the below goroutine when a done message is received
@@ -94,6 +115,32 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 		}
 	}()
 
+	go func() {
+		for {
+			select {
+			case count := <-processingSuccessfulChan:
+				successCount += count
+			case <-processingSuccessfulDoneChan:
+				close(processingSuccessfulDoneChan)
+				close(processingSuccessfulChan)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case count := <-processingAttemptedChan:
+				attemptedCount += count
+			case <-processingAttemptedDoneChan:
+				close(processingAttemptedDoneChan)
+				close(processingAttemptedChan)
+				return
+			}
+		}
+	}()
+
 	counter := 0
 	var contractProcessingGroup sync.WaitGroup
 
@@ -113,10 +160,10 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 
 		contractProcessingGroup.Add(1)
 
-		go func(ctx context.Context, contractAddress string, abi abi.ABI, namespace string, wg *sync.WaitGroup) {
+		go func(ctx context.Context, contractAddress string, abi abi.ABI, options *Options, cfg aws.Config, wg *sync.WaitGroup) {
 			defer wg.Done()
 
-			contractAbi := NewAbiContract(contractAddress, abi, namespace)
+			contractAbi := NewAbiContract(contractAddress, abi, options.Namespace)
 			contractAbi.ValidateNames()
 			if contractAbi.Skip {
 				log.Println("skipping contract due to long event or method name")
@@ -124,24 +171,41 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 			}
 			multiStatementBuffer := contractAbi.GenerateSql()
 			numStatements := contractAbi.GetNumberOfStatements()
-			multiStatementCtx, _ := sf.WithMultiStatement(ctx, numStatements)
 
 			viewCountChan <- numStatements
-
-			if !dryRun {
-				// Since query statements just create views there is no need to catch the result object
-				_, err = db.ExecContext(multiStatementCtx, multiStatementBuffer.String())
+			
+			message := internal.NewMessage(contractAddress, multiStatementBuffer.String(), numStatements)
+			
+			if !options.DryRun {
+				body, err := internal.SerializeMessage(message)
 				if err != nil {
 					snowflakeError := NewSnowflakeError(contractAddress, err)
 					processingErrorChan <- *snowflakeError
+					processingAttemptedChan <- 1
+					return
 				}
+
+				if err = aws.SendSQSMessage(cfg, options.QueueUrl, body); err != nil {
+					snowflakeError := NewSnowflakeError(contractAddress, err)
+					processingErrorChan <- *snowflakeError
+					processingAttemptedChan <- 1
+					return
+				}
+
+				processingAttemptedChan <- 1
+				processingSuccessfulChan <- 1
 			}
 
-		}(ctx, contractAddress, abiVal, namespace, &contractProcessingGroup)
+		}(ctx, contractAddress, abiVal, options, cfg, &contractProcessingGroup)
 
 		counter += 1
 		if counter%100 == 0 {
 			log.Printf("%d contract addresses processed so far...\n", counter)
+		}
+
+		if attemptedCount%1000 == 0 {
+			pct := fmt.Sprintf("%0.1f%%", (float64(successCount)/float64(attemptedCount))*100)
+			log.Printf("%d messages out of %d successfully submitted (%s)\n", successCount, attemptedCount, pct)
 		}
 	}
 
@@ -150,6 +214,8 @@ func CreateViews(ctx context.Context, dsn string, namespace string, dryRun bool)
 
 	processingDoneChan <- 0
 	viewCountDoneChan <- 0
+	processingAttemptedDoneChan <- 0
+	processingSuccessfulDoneChan <- 0
 
 	if len(processingErrors) > 0 {
 		log.Printf("processing finished with %d errors\n", len(processingErrors))

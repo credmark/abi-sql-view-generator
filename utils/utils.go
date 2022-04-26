@@ -69,6 +69,43 @@ type AbiMethod struct {
 	Namespace string
 }
 
+type Options struct {
+	DSN string
+	Namespace string
+	Key string
+	Secret string
+	Region string
+	QueueUrl string
+	DryRun bool
+	Drop bool
+	AddLimit bool
+	Limit int
+	Count int
+}
+
+func NewOptions(dsn, namespace, key, secret, region, queueURL string, dryRun, drop bool, limit, count int) *Options {
+	var addLimit bool
+	if (limit > 0) {
+		addLimit = true
+	} else {
+		addLimit = false
+	}
+
+	return &Options{
+		DSN: dsn,
+		Namespace: namespace,
+		Key: key,
+		Secret: secret,
+		Region: region,
+		QueueUrl: queueURL,
+		DryRun: dryRun,
+		Drop: drop,
+		AddLimit: addLimit,
+		Limit: limit,
+		Count: count,
+	}
+}
+
 func NewAbiContract(contractAddress string, abi abi.ABI, namespace string) *AbiContract {
 	return &AbiContract{
 		Events:  newAbiEvents(abi, contractAddress, namespace),
