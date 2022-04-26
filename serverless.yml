@@ -1,0 +1,39 @@
+---
+service: abi-sql-view-consumer
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: go1.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-west-2'}
+  iam:
+    role: ${env:LAMBDA_CONSUMER_ROLE_ARN}
+
+package:
+  patterns:
+    - '!./**'
+    - ./bin/**
+
+functions:
+  consumer:
+    handler: bin/consumer
+    timeout: 300
+    events:
+      - sqs:
+          arn: ${env:SQS_QUEUE_ARN}
+          batchSize: 100
+          maximumBatchingWindow: 10
+    environment:
+      SF_ACCOUNT: ${env:SF_ACCOUNT}
+      SF_USER: ${env:SF_USER}
+      SF_PASSWORD: ${env:SF_PASSWORD}
+      SF_DATABASE: ${env:SF_DATABASE}
+      SF_SCHEMA: ${env:SF_SCHEMA}
+      SF_WAREHOUSE: ${env:SF_WAREHOUSE}
+      SF_ROLE: ${env:SF_ROLE}
+      LAMBDA_ACCESS_KEY_ID: ${env:AWS_ACCESS_KEY_ID}
+      LAMBDA_SECRET_ACCESS_KEY: ${env:AWS_SECRET_ACCESS_KEY}
+      LAMBDA_REGION: ${env:AWS_REGION}
+      SQS_QUEUE_URL: ${env:SQS_QUEUE_URL}
+
