@@ -10,6 +10,19 @@ jobs:
     name: 'Build and Deploy'
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    env:
+      LAMBDA_CONSUMER_ROLE_ARN: ${{ secrets.LAMBDA_CONSUMER_ROLE_ARN }}
+      SF_ACCOUNT: ${{ secrets.SF_ACCOUNT }}
+      SF_USER: ${{ secrets.SF_USER }}
+      SF_PASSWORD: ${{ secrets.SF_PASSWORD }}
+      SF_DATABASE: ${{ secrets.SF_DATABASE }}
+      SF_SCHEMA: ${{ secrets.SF_SCHEMA }}
+      SF_WAREHOUSE: ${{ secrets.SF_WAREHOUSE }}
+      SF_ROLE: ${{ secrets.SF_ROLE }}
+      LAMBDA_ACCESS_KEY_ID: ${{ secrets.LAMBDA_ACCESS_KEY_ID }}
+      LAMBDA_SECRET_ACCESS_KEY: ${{ secrets.LAMBDA_SECRET_ACCESS_KEY }}
+      LAMBDA_REGION: ${{ secrets.AWS_REGION }}
+      SQS_QUEUE_URL: ${{ secrets.SQS_QUEUE_URL }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
