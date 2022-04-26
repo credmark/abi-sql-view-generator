@@ -21,9 +21,9 @@ var (
 	schema    = os.Getenv("SF_SCHEMA")
 	warehouse = os.Getenv("SF_WAREHOUSE")
 	role      = os.Getenv("SF_ROLE")
-	key       = os.Getenv("AWS_ACCESS_KEY_ID")
-	secret    = os.Getenv("AWS_SECRET_ACCESS_KEY")
-	region    = os.Getenv("AWS_REGION")
+	key       = os.Getenv("LAMBDA_ACCESS_KEY_ID")
+	secret    = os.Getenv("LAMBDA_SECRET_ACCESS_KEY")
+	region    = os.Getenv("LAMBDA_REGION")
 	queueURL  = os.Getenv("SQS_QUEUE_URL")
 )
 
@@ -33,6 +33,7 @@ func init() {
 
 func Handler(event events.SQSEvent) {
 	SQSConfig := internal.NewConfig(key, secret, region)
+	ctx := context.Background()
 
 	// Processing channels
 	deleteChan := make(chan string)
@@ -95,8 +96,10 @@ func Handler(event events.SQSEvent) {
 
 	for _, record := range event.Records {
 		wg.Add(1)
-		go internal.HandleSQSMessage(context.TODO(), record, db, wg, deleteChan, errorChan)
+		go internal.HandleSQSMessage(ctx, record, db, wg, deleteChan, errorChan)
 	}
+
+	wg.Wait()
 
 	deleteDoneChan <- 0
 	errorDoneChan <- 0

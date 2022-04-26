@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -34,14 +35,22 @@ func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB, 
 	message, err := internal.DeserializeMessage(event.Body)
 	if err != nil {
 		errorChan <- fmt.Errorf("error deserializing SQS message body: %w", err)
+		return
 	}
 
-	multiStatementCtx, _ := sf.WithMultiStatement(ctx, message.NumberOfStatements)
+	uuid := sf.NewUUID()
+	ctxWithId := sf.WithRequestID(ctx, uuid)
+	multiStatementCtx, _ := sf.WithMultiStatement(ctxWithId, message.NumberOfStatements)
+
+	log.Printf("submitting query with query ID: %s\n", uuid.String())
 
 	_, err = db.ExecContext(multiStatementCtx, message.SQLStatements)
 	if err != nil {
 		errorChan <- fmt.Errorf("error with multistatement query for contract address: %s: %w", message.ContractAddress, err)
+		return
 	}
+
+	log.Printf("query ID %s completed. Deleting SQS message receipt handle %s\n", uuid.String(), event.ReceiptHandle)
 
 	successChan <- event.ReceiptHandle
 }
@@ -57,6 +66,8 @@ func DeleteSQSMessage(cfg Config, queueURL string, receiptHandle string) error {
 	if err != nil {
 		return fmt.Errorf("error deleting SQS message: %w", err)
 	}
+
+	log.Printf("SQS message with receipt handle %s deleted\n", receiptHandle)
 
 	return nil
 }
