@@ -23,6 +23,7 @@ jobs:
       LAMBDA_SECRET_ACCESS_KEY: ${{ secrets.LAMBDA_SECRET_ACCESS_KEY }}
       LAMBDA_REGION: ${{ secrets.AWS_REGION }}
       SQS_QUEUE_URL: ${{ secrets.SQS_QUEUE_URL }}
+      SQS_QUEUE_ARN: ${{ secrets.SQS_QUEUE_ARN }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
