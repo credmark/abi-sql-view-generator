@@ -56,8 +56,6 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 
 	// Processing channels
 	errorChan := make(chan error)
-	errorDoneChan := make(chan int)
-	errors := make([]error, 0)
 
 	cfg := sf.Config{
 		User:      user,
@@ -81,19 +79,6 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 	}
 	defer db.Close()
 
-	go func() {
-		for {
-			select {
-			case err := <-errorChan:
-				log.Printf("received err on error channel: %s\n", err.Error())
-				errors = append(errors, err)
-			case <-errorDoneChan:
-				close(errorChan)
-				close(errorDoneChan)
-			}
-		}
-	}()
-
 	wg := new(sync.WaitGroup)
 
 	for _, record := range event.Records {
@@ -116,17 +101,17 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 	log.Println("finished processing SQS records")
 
 	wg.Wait()
+	close(errorChan)
 
-	errorDoneChan <- 0
+	errors := make([]error, 0)
+
+	for err := range errorChan {
+		log.Println("ERROR:", err)
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
-		log.Println("errors handling SQS message")
-
-		for _, err := range errors {
-			log.Println("ERROR:", err)
-		}
-
-		os.Exit(1)
+		log.Fatal("errors encountered in processing")
 	}
 
 	return nil
