@@ -21,7 +21,7 @@ jobs:
       SF_ROLE: ${{ secrets.SF_ROLE }}
       LAMBDA_ACCESS_KEY_ID: ${{ secrets.LAMBDA_ACCESS_KEY_ID }}
       LAMBDA_SECRET_ACCESS_KEY: ${{ secrets.LAMBDA_SECRET_ACCESS_KEY }}
-      LAMBDA_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       SQS_QUEUE_URL: ${{ secrets.SQS_QUEUE_URL }}
       SQS_QUEUE_ARN: ${{ secrets.SQS_QUEUE_ARN }}
 
