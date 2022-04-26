@@ -81,8 +81,6 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 	}
 	defer db.Close()
 
-	wg := sync.WaitGroup{}
-
 	go func() {
 		for {
 			select {
@@ -96,9 +94,11 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 		}
 	}()
 
+	wg := new(sync.WaitGroup)
+
 	for _, record := range event.Records {
 		wg.Add(1)
-		go func(ctx context.Context, client *sqs.Client, queueName string, record events.SQSMessage, db *sql.DB, wg sync.WaitGroup, errorChan chan error) {
+		go func(ctx context.Context, client *sqs.Client, queueName string, record events.SQSMessage, db *sql.DB, wg *sync.WaitGroup, errorChan chan error) {
 			defer wg.Done()
 
 			if err := internal.HandleSQSMessage(ctx, record, db); err != nil {
@@ -112,6 +112,8 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 			}
 		}(ctx, client, queueName, record, db, wg, errorChan)
 	}
+
+	log.Println("finished processing SQS records")
 
 	wg.Wait()
 
