@@ -150,12 +150,14 @@ func CreateViews(ctx context.Context, options *Options) {
 		bs := []byte{}
 		err := rows.Scan(&contractAddress, &bs)
 		if err != nil {
-			log.Fatal(err)
+			processingErrorChan <- *NewSnowflakeError(contractAddress, err)
+			continue
 		}
 
 		abiVal, err := abi.JSON(strings.NewReader(string(bs)))
 		if err != nil {
-			log.Fatal(err)
+			processingErrorChan <- *NewSnowflakeError(contractAddress, err)
+			continue
 		}
 
 		contractProcessingGroup.Add(1)
