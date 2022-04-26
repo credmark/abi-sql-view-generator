@@ -55,19 +55,20 @@ func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB, 
 	successChan <- event.ReceiptHandle
 }
 
-func DeleteSQSMessage(cfg Config, queueURL string, receiptHandle string) error {
+func DeleteSQSMessage(ctx context.Context, cfg Config, queueURL string, receiptHandle string, errorChan chan error) {
 	config := aws.Config(cfg)
 	client := sqs.NewFromConfig(config)
 
-	_, err := client.DeleteMessage(context.TODO(), &sqs.DeleteMessageInput{
+	log.Printf("deleting SQS message from queue URL %s\n", queueURL)
+
+	_, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
 	})
 	if err != nil {
-		return fmt.Errorf("error deleting SQS message: %w", err)
+		errorChan <- fmt.Errorf("error deleting SQS message: %w", err)
 	}
 
 	log.Printf("SQS message with receipt handle %s deleted\n", receiptHandle)
 
-	return nil
 }

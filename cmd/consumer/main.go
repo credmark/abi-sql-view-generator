@@ -70,10 +70,8 @@ func Handler(event events.SQSEvent) {
 		for {
 			select {
 			case receiptHandle := <-deleteChan:
-				err := internal.DeleteSQSMessage(SQSConfig, queueURL, receiptHandle)
-				if err != nil {
-					errorChan <- err
-				}
+				log.Printf("received receiptHandle on delete channel: %s\n", receiptHandle)
+				internal.DeleteSQSMessage(ctx, SQSConfig, queueURL, receiptHandle, errorChan)
 			case <-deleteDoneChan:
 				close(deleteChan)
 				close(deleteDoneChan)
@@ -86,6 +84,7 @@ func Handler(event events.SQSEvent) {
 		for {
 			select {
 			case err := <-errorChan:
+				log.Printf("received err on error channel: %s\n", err.Error())
 				errors = append(errors, err)
 			case <-errorDoneChan:
 				close(errorChan)
