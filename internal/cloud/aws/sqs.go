@@ -35,6 +35,8 @@ func HandleSQSMessage(ctx context.Context, client *sqs.Client, event events.SQSM
 		return fmt.Errorf("error deserializing SQS message body: %w", err)
 	}
 
+	log.Printf("message details: ContractAddress=%s NumberOfStatements=%d\n", message.ContractAddress, message.NumberOfStatements)
+
 	if message.NumberOfStatements == 0 {
 		log.Println("message has 0 sql statements to process. Deleting message...")
 		return DeleteSQSMessage(ctx, client, queueName, event.ReceiptHandle)
