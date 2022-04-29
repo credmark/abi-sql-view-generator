@@ -28,11 +28,16 @@ func SendSQSMessage(cfg Config, queueURL string, body string) error {
 	return nil
 }
 
-func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB) error {
+func HandleSQSMessage(ctx context.Context, client *sqs.Client, event events.SQSMessage, queueName string, db *sql.DB) error {
 
 	message, err := internal.DeserializeMessage(event.Body)
 	if err != nil {
 		return fmt.Errorf("error deserializing SQS message body: %w", err)
+	}
+
+	if message.NumberOfStatements == 0 {
+		log.Println("message has 0 sql statements to process. Deleting message...")
+		return DeleteSQSMessage(ctx, client, queueName, event.ReceiptHandle)
 	}
 
 	uuid := sf.NewUUID()
@@ -48,7 +53,7 @@ func HandleSQSMessage(ctx context.Context, event events.SQSMessage, db *sql.DB) 
 
 	log.Printf("query ID %s completed. Deleting SQS message receipt handle %s\n", uuid.String(), event.ReceiptHandle)
 
-	return nil
+	return DeleteSQSMessage(ctx, client, queueName, event.ReceiptHandle)
 }
 
 func DeleteSQSMessage(ctx context.Context, client *sqs.Client, queueName string, receiptHandle string) error {

@@ -86,12 +86,7 @@ func Handler(ctx context.Context, event events.SQSEvent) error {
 		go func(ctx context.Context, client *sqs.Client, queueName string, record events.SQSMessage, db *sql.DB, wg *sync.WaitGroup, errorChan chan error) {
 			defer wg.Done()
 
-			if err := internal.HandleSQSMessage(ctx, record, db); err != nil {
-				errorChan <- err
-				return
-			}
-
-			if err = internal.DeleteSQSMessage(ctx, client, queueName, record.ReceiptHandle); err != nil {
+			if err := internal.HandleSQSMessage(ctx, client, record, queueName, db); err != nil {
 				errorChan <- err
 				return
 			}
