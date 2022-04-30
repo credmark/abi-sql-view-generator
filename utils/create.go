@@ -175,7 +175,12 @@ func CreateViews(ctx context.Context, options *Options) {
 			numStatements := contractAbi.GetNumberOfStatements()
 
 			viewCountChan <- numStatements
-			
+
+			if numStatements == 0 {
+				log.Printf("contract_address %s has no events or methods. Skipping...\n", contractAddress)
+				return
+			}
+
 			message := internal.NewMessage(contractAddress, multiStatementBuffer.String(), numStatements)
 			
 			if !options.DryRun {
