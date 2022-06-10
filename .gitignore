@@ -44,3 +44,6 @@ out
 
 # golang output binary directory
 bin
+
+# macos
+.DS_Store
