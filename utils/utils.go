@@ -8,6 +8,7 @@ import (
 	"log"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -81,14 +82,23 @@ type Options struct {
 	AddLimit bool
 	Limit int
 	Count int
+	ContractList []string
 }
 
-func NewOptions(dsn, namespace, key, secret, region, queueURL string, dryRun, drop bool, limit, count int) *Options {
+func NewOptions(dsn, namespace, key, secret, region, queueURL string, dryRun, drop bool, limit, count int, contractList string) *Options {
 	var addLimit bool
 	if (limit > 0) {
 		addLimit = true
 	} else {
 		addLimit = false
+	}
+
+	var contracts []string
+	s := strings.Split(contractList, ",")
+	if s[0] == "" {
+		contracts = []string{}
+	} else {
+		contracts = s
 	}
 
 	return &Options{
@@ -103,6 +113,7 @@ func NewOptions(dsn, namespace, key, secret, region, queueURL string, dryRun, dr
 		AddLimit: addLimit,
 		Limit: limit,
 		Count: count,
+		ContractList: contracts,
 	}
 }
 
